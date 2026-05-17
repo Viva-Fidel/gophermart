@@ -8,7 +8,8 @@ import (
 func TestLoadFlags_MergesEnvAndArgs(t *testing.T) {
 	t.Setenv("JWT_SECRET", "sec")
 	t.Setenv("TOKEN_EXP", "2h")
-	t.Setenv("RUN_ADDRESS", ":6000")
+	t.Setenv("RUN_ADDRESS", ":1234")
+	t.Setenv("ACCRUAL_SYSTEM_ADDRESS", "http://accrual-env")
 
 	old := os.Args
 	t.Cleanup(func() { os.Args = old })
@@ -18,7 +19,7 @@ func TestLoadFlags_MergesEnvAndArgs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if flags.RunAddress != ":6000" {
+	if flags.RunAddress != ":1234" {
 		t.Fatal(flags.RunAddress)
 	}
 	if flags.DatabaseURI != "postgres://flag" {

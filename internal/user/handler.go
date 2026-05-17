@@ -47,9 +47,6 @@ func RegisterHTTP(router *http.ServeMux, h *Handler) {
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Login == "" || req.Password == "" {
-		if err != nil {
-			slog.WarnContext(r.Context(), "register decode", slog.Any("error", err))
-		}
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -71,9 +68,6 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Login == "" || req.Password == "" {
-		if err != nil {
-			slog.WarnContext(r.Context(), "login decode", slog.Any("error", err))
-		}
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}

@@ -1,7 +1,6 @@
 package balance
 
 import (
-	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -27,15 +26,9 @@ func RegisterHTTP(router *http.ServeMux, auth func(http.Handler) http.Handler, h
 	router.Handle("GET /api/user/withdrawals", auth(http.HandlerFunc(h.ListWithdrawals)))
 }
 
-// Получает user id из контекста
-func userIDFromContext(ctx context.Context) (int64, bool) {
-	uid, ok := middleware.UserIDFromContext(ctx)
-	return uid, ok
-}
-
 // Получает баланс пользователя
 func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
-	uid, ok := userIDFromContext(r.Context())
+	uid, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -55,16 +48,13 @@ func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
 
 // Списывает средства с баланса пользователя
 func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
-	uid, ok := userIDFromContext(r.Context())
+	uid, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 	var req WithdrawRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Order == "" || req.Sum <= 0 {
-		if err != nil {
-			slog.WarnContext(r.Context(), "withdraw decode", slog.Any("error", err))
-		}
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -79,7 +69,7 @@ func (h *Handler) Withdraw(w http.ResponseWriter, r *http.Request) {
 
 // Получает список выводов средств
 func (h *Handler) ListWithdrawals(w http.ResponseWriter, r *http.Request) {
-	uid, ok := userIDFromContext(r.Context())
+	uid, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		w.WriteHeader(http.StatusUnauthorized)
 		return

@@ -1,7 +1,6 @@
 package order
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -28,22 +27,15 @@ func RegisterHTTP(router *http.ServeMux, auth func(http.Handler) http.Handler, h
 	router.Handle("GET /api/user/orders", auth(http.HandlerFunc(h.ListOrders)))
 }
 
-// Получает user id из контекста
-func userIDFromContext(ctx context.Context) (int64, bool) {
-	uid, ok := middleware.UserIDFromContext(ctx)
-	return uid, ok
-}
-
 // Загружает заказ
 func (h *Handler) UploadOrder(w http.ResponseWriter, r *http.Request) {
-	uid, ok := userIDFromContext(r.Context())
+	uid, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		slog.WarnContext(r.Context(), "upload order read body", slog.Any("error", err))
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -63,7 +55,7 @@ func (h *Handler) UploadOrder(w http.ResponseWriter, r *http.Request) {
 
 // Получает список заказов
 func (h *Handler) ListOrders(w http.ResponseWriter, r *http.Request) {
-	uid, ok := userIDFromContext(r.Context())
+	uid, ok := middleware.UserIDFromContext(r.Context())
 	if !ok {
 		w.WriteHeader(http.StatusUnauthorized)
 		return

@@ -11,26 +11,25 @@ type Config struct {
 	Auth       AuthConfig
 }
 
-
 type ServerConfig struct {
-	Address *string `env:"RUN_ADDRESS"`
+	Address string `env:"RUN_ADDRESS" envDefault:":8080"`
 }
 
 type DbConfig struct {
-	DatabaseURI       *string `env:"DATABASE_URI"`
+	DatabaseURI string `env:"DATABASE_URI"`
 }
 
 type AccuralConfig struct {
-	AccuralSystemAdress *string `env:"ACCRUAL_SYSTEM_ADDRESS"`
+	AccuralSystemAdress string `env:"ACCRUAL_SYSTEM_ADDRESS"`
 }
 
 type AuthConfig struct {
 	JWTSecret string `env:"JWT_SECRET" envDefault:"gophermart-dev-secret"`
-	TokenExp string `env:"TOKEN_EXP" envDefault:"24h"`
+	TokenExp  string `env:"TOKEN_EXP" envDefault:"24h"`
 }
 
 // Загружает конфигурацию
-func LoadConfig() (*Config, error) {
+func loadConfig() (*Config, error) {
 	cfg := Config{}
 
 	if err := env.Parse(&cfg); err != nil {

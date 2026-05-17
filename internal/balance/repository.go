@@ -3,8 +3,9 @@ package balance
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"log/slog"
+
+	pkgdb "gophermart/pkg/db"
 )
 
 type BalanceRepository struct {
@@ -32,34 +33,29 @@ func (repo *BalanceRepository) GetBalance(ctx context.Context, userID int64) (Ba
 
 // Создаёт вывод средств
 func (repo *BalanceRepository) CreateWithdrawal(ctx context.Context, userID int64, order string, sum float64) error {
-	tx, err := repo.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := tx.Rollback(); err != nil && !errors.Is(err, sql.ErrTxDone) {
-			slog.ErrorContext(ctx, "withdraw tx rollback", slog.Any("error", err))
+	// Создаём транзакцию
+	return pkgdb.WithSerializableTx(ctx, repo.db, func(tx *sql.Tx) error {
+		// Получаем сумму начислений и выводов
+		var accrued, withdrawn float64
+		
+		if err := tx.QueryRowContext(ctx, `
+			SELECT
+				COALESCE((SELECT SUM(accrual) FROM orders WHERE user_id = $1 AND status = 'PROCESSED'), 0),
+				COALESCE((SELECT SUM(sum) FROM withdrawals WHERE user_id = $1), 0)
+		`, userID).Scan(&accrued, &withdrawn); err != nil {
+			return err
 		}
-	}()
-
-	var accrued, withdrawn float64
-	err = tx.QueryRowContext(ctx, `
-		SELECT
-			COALESCE((SELECT SUM(accrual) FROM orders WHERE user_id = $1 AND status = 'PROCESSED'), 0),
-			COALESCE((SELECT SUM(sum) FROM withdrawals WHERE user_id = $1), 0)
-	`, userID).Scan(&accrued, &withdrawn)
-	if err != nil {
+		// Проверяем, достаточно ли средств на балансе
+		if accrued-withdrawn < sum {
+			// Возвращаем ошибку, если не достаточно средств
+			return ErrNotEnoughBalance
+		}
+		// Создаём вывод средств
+		_, err := tx.ExecContext(ctx,
+			`INSERT INTO withdrawals (user_id, order_number, sum) VALUES ($1, $2, $3)`, userID, order, sum,
+		)
 		return err
-	}
-	if accrued-withdrawn < sum {
-		return ErrNotEnoughBalance
-	}
-	if _, err = tx.ExecContext(ctx,
-		`INSERT INTO withdrawals (user_id, order_number, sum) VALUES ($1, $2, $3)`, userID, order, sum,
-	); err != nil {
-		return err
-	}
-	return tx.Commit()
+	})
 }
 
 // Получает список выводов средств

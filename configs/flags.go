@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"flag"
 	"os"
 )
@@ -14,32 +15,35 @@ type Flags struct {
 }
 
 func parseFlags(conf *Config, fs *flag.FlagSet, args []string) (*Flags, error) {
-	flags := &Flags{}
-	fs.StringVar(&flags.RunAddress, "a", ":8080", "service run address")
-	fs.StringVar(&flags.DatabaseURI, "d", "", "postgres connection uri")
-	fs.StringVar(&flags.AccrualSystemAdress, "r", "", "accrual system address")
+	// Инициализирует флаги и берём данные из конфигурации
+	flags := &Flags{
+		RunAddress:          conf.Server.Address,
+		DatabaseURI:         conf.Db.DatabaseURI,
+		AccrualSystemAdress: conf.Accural.AccuralSystemAdress,
+		JWTSecret:           conf.Auth.JWTSecret,
+		TokenExp:            conf.Auth.TokenExp,
+	}
+
+	// Регистрируем флаги и перезаписываем данные из конфигурации
+	fs.StringVar(&flags.RunAddress, "a", flags.RunAddress, "service run address")
+	fs.StringVar(&flags.DatabaseURI, "d", flags.DatabaseURI, "postgres connection uri")
+	fs.StringVar(&flags.AccrualSystemAdress, "r", flags.AccrualSystemAdress, "accrual system address")
 	if err := fs.Parse(args); err != nil {
 		return nil, err
 	}
-
-	if conf.Server.Address != nil {
-		flags.RunAddress = *conf.Server.Address
+	if flags.DatabaseURI == "" {
+		return nil, errors.New("database URI is required")
 	}
-	if conf.Db.DatabaseURI != nil {
-		flags.DatabaseURI = *conf.Db.DatabaseURI
+	if flags.AccrualSystemAdress == "" {
+		return nil, errors.New("accrual system address is required")
 	}
-	if conf.Accural.AccuralSystemAdress != nil {
-		flags.AccrualSystemAdress = *conf.Accural.AccuralSystemAdress
-	}
-
-	flags.JWTSecret = conf.Auth.JWTSecret
-	flags.TokenExp = conf.Auth.TokenExp
 
 	return flags, nil
 }
 
+// Загружает флаги и конфигурацию
 func LoadFlags() (*Flags, error) {
-	conf, err := LoadConfig()
+	conf, err := loadConfig()
 	if err != nil {
 		return nil, err
 	}

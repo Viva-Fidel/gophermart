@@ -21,7 +21,6 @@ import (
 
 func main() {
 	// Устанавливает логгер
-	// Устанавливает логгер
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
 	// Загружает флаги и конфигурацию
@@ -88,7 +87,12 @@ func main() {
 	}
 
 	// Запускает worker
-	go worker.Run(ctx)
+	workerDone := make(chan struct{})
+	go func() {
+		worker.Run(ctx)
+		close(workerDone)
+	}()
+
 	// Запускает HTTP сервер
 	go func() {
 		if err := httpSrv.Serve(ln); err != nil && err != http.ErrServerClosed {
@@ -101,14 +105,18 @@ func main() {
 
 	// Ожидает сигнала завершения
 	<-ctx.Done()
+
 	// Создаёт контекст с таймаутом для завершения работы
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+
 	// Отменяет контекст при завершении работы
 	defer cancel()
-	// Завершает работу HTTP сервера
 	if err := httpSrv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("http shutdown", slog.Any("error", err))
 	}
+
+	// Ожидает завершения работы worker
+	<-workerDone
 	slog.Info("gophermart stopped")
 	if err := os.Stdout.Sync(); err != nil {
 		slog.Error("stdout sync", slog.Any("error", err))

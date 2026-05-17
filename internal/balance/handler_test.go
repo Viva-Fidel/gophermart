@@ -2,18 +2,20 @@ package balance
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"go.uber.org/mock/gomock"
+
 	"gophermart/pkg/middleware"
 )
 
 func TestHandler_GetBalance_Unauthorized(t *testing.T) {
-	h := NewHandler(HandlerDeps{Service: New(&stubBalanceRepo{})})
+	ctrl := gomock.NewController(t)
+	h := NewHandler(HandlerDeps{Service: New(NewMockRepository(ctrl))})
 	rec := httptest.NewRecorder()
 	h.GetBalance(rec, httptest.NewRequest(http.MethodGet, "/b", nil))
 	if rec.Code != http.StatusUnauthorized {
@@ -22,11 +24,9 @@ func TestHandler_GetBalance_Unauthorized(t *testing.T) {
 }
 
 func TestHandler_GetBalance_OK(t *testing.T) {
-	repo := &stubBalanceRepo{
-		getFn: func(ctx context.Context, userID int64) (Balance, error) {
-			return Balance{Current: 10, Withdrawn: 2}, nil
-		},
-	}
+	ctrl := gomock.NewController(t)
+	repo := NewMockRepository(ctrl)
+	repo.EXPECT().GetBalance(gomock.Any(), int64(1)).Return(Balance{Current: 10, Withdrawn: 2}, nil)
 	h := NewHandler(HandlerDeps{Service: New(repo)})
 	req := httptest.NewRequest(http.MethodGet, "/b", nil)
 	req = req.WithContext(middleware.WithUserID(req.Context(), 1))
@@ -38,7 +38,8 @@ func TestHandler_GetBalance_OK(t *testing.T) {
 }
 
 func TestHandler_Withdraw_BadJSON(t *testing.T) {
-	h := NewHandler(HandlerDeps{Service: New(&stubBalanceRepo{})})
+	ctrl := gomock.NewController(t)
+	h := NewHandler(HandlerDeps{Service: New(NewMockRepository(ctrl))})
 	req := httptest.NewRequest(http.MethodPost, "/w", bytes.NewReader([]byte(`{`)))
 	req = req.WithContext(middleware.WithUserID(req.Context(), 1))
 	rec := httptest.NewRecorder()
@@ -49,11 +50,9 @@ func TestHandler_Withdraw_BadJSON(t *testing.T) {
 }
 
 func TestHandler_Withdraw_500(t *testing.T) {
-	repo := &stubBalanceRepo{
-		withdrawFn: func(ctx context.Context, userID int64, order string, sum float64) error {
-			return errors.New("db")
-		},
-	}
+	ctrl := gomock.NewController(t)
+	repo := NewMockRepository(ctrl)
+	repo.EXPECT().CreateWithdrawal(gomock.Any(), int64(1), "79927398713", float64(1)).Return(errors.New("db"))
 	h := NewHandler(HandlerDeps{Service: New(repo)})
 	body, _ := json.Marshal(WithdrawRequest{Order: "79927398713", Sum: 1})
 	req := httptest.NewRequest(http.MethodPost, "/w", bytes.NewReader(body))
@@ -67,11 +66,9 @@ func TestHandler_Withdraw_500(t *testing.T) {
 }
 
 func TestHandler_ListWithdrawals_500(t *testing.T) {
-	repo := &stubBalanceRepo{
-		listFn: func(ctx context.Context, userID int64) ([]Withdrawal, error) {
-			return nil, errors.New("db")
-		},
-	}
+	ctrl := gomock.NewController(t)
+	repo := NewMockRepository(ctrl)
+	repo.EXPECT().ListWithdrawals(gomock.Any(), int64(1)).Return(nil, errors.New("db"))
 	h := NewHandler(HandlerDeps{Service: New(repo)})
 	req := httptest.NewRequest(http.MethodGet, "/w", nil)
 	req = req.WithContext(middleware.WithUserID(req.Context(), 1))
@@ -83,11 +80,9 @@ func TestHandler_ListWithdrawals_500(t *testing.T) {
 }
 
 func TestHandler_Withdraw_402(t *testing.T) {
-	repo := &stubBalanceRepo{
-		withdrawFn: func(ctx context.Context, userID int64, order string, sum float64) error {
-			return ErrNotEnoughBalance
-		},
-	}
+	ctrl := gomock.NewController(t)
+	repo := NewMockRepository(ctrl)
+	repo.EXPECT().CreateWithdrawal(gomock.Any(), int64(1), "79927398713", float64(1)).Return(ErrNotEnoughBalance)
 	h := NewHandler(HandlerDeps{Service: New(repo)})
 	body, _ := json.Marshal(WithdrawRequest{Order: "79927398713", Sum: 1})
 	req := httptest.NewRequest(http.MethodPost, "/w", bytes.NewReader(body))
@@ -101,11 +96,9 @@ func TestHandler_Withdraw_402(t *testing.T) {
 }
 
 func TestHandler_List_NoContent(t *testing.T) {
-	repo := &stubBalanceRepo{
-		listFn: func(ctx context.Context, userID int64) ([]Withdrawal, error) {
-			return nil, nil
-		},
-	}
+	ctrl := gomock.NewController(t)
+	repo := NewMockRepository(ctrl)
+	repo.EXPECT().ListWithdrawals(gomock.Any(), int64(1)).Return(nil, nil)
 	h := NewHandler(HandlerDeps{Service: New(repo)})
 	req := httptest.NewRequest(http.MethodGet, "/w", nil)
 	req = req.WithContext(middleware.WithUserID(req.Context(), 1))
@@ -117,11 +110,9 @@ func TestHandler_List_NoContent(t *testing.T) {
 }
 
 func TestHandler_GetBalance_500(t *testing.T) {
-	repo := &stubBalanceRepo{
-		getFn: func(ctx context.Context, userID int64) (Balance, error) {
-			return Balance{}, errors.New("db")
-		},
-	}
+	ctrl := gomock.NewController(t)
+	repo := NewMockRepository(ctrl)
+	repo.EXPECT().GetBalance(gomock.Any(), int64(1)).Return(Balance{}, errors.New("db"))
 	h := NewHandler(HandlerDeps{Service: New(repo)})
 	req := httptest.NewRequest(http.MethodGet, "/b", nil)
 	req = req.WithContext(middleware.WithUserID(req.Context(), 1))
